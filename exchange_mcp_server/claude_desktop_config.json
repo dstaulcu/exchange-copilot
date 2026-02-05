@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "exchange-assistant": {
+      "command": "python",
+      "args": ["-m", "mcp"],
+      "cwd": "c:\\code\\exchange_mcp",
+      "env": {}
+    }
+  }
+}

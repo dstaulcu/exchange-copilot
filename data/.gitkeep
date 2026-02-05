@@ -1,0 +1,3 @@
+# This directory contains the SQLite database
+# The database will be created automatically on first run
+*.db
