@@ -10,6 +10,10 @@ A personal AI assistant that connects to your Microsoft Exchange email and calen
 ![Python](https://img.shields.io/badge/python-3.11+-green.svg)
 ![Status](https://img.shields.io/badge/status-prototype-orange.svg)
 
+## 🎬 Demo
+
+![Exchange Copilot Demo](assets/demo.gif)
+
 ## 📚 Documentation
 
 | Guide | Description |
