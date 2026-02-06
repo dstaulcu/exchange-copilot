@@ -36,9 +36,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Source the mock data generator
-. "$PSScriptRoot\..\src\utils\MockDataGenerator.ps1"
-
 if (-not $Quiet) {
     Write-Host "============================================================" -ForegroundColor Cyan
     Write-Host "  Incremental Data Update" -ForegroundColor Cyan
@@ -66,9 +63,6 @@ if (-not $Quiet) {
     Write-Host ""
 }
 
-# Initialize generator
-$generator = New-MockDataGenerator -Domain "dataflow.local"
-
 # Get colleague list (everyone except protagonist)
 $colleagueList = @($users.Values | Where-Object { $_.Email -ne $protagonist.Email })
 
@@ -95,6 +89,10 @@ $topics = @(
 # Track new items
 $newEmailIds = @()
 $newMeetingIds = @()
+$emailCounter = 1
+$topicIndex = 0
+$subjectIndex = 0
+$senderIndex = 0
 
 # Generate new inbox emails
 if (-not $Quiet) {
@@ -102,16 +100,16 @@ if (-not $Quiet) {
 }
 
 for ($i = 0; $i -lt $NewInboxCount; $i++) {
-    $sender = $colleagueList[(Get-Random -Maximum $colleagueList.Count)]
-    $subject = $newSubjects[(Get-Random -Maximum $newSubjects.Count)]
-    $topic = $topics[(Get-Random -Maximum $topics.Count)]
+    $sender = $colleagueList[$senderIndex % $colleagueList.Count]
+    $subject = $newSubjects[$subjectIndex % $newSubjects.Count]
+    $topic = $topics[$topicIndex % $topics.Count]
     $subject = $subject -replace '\{topic\}', $topic
     
     # Recent emails (last 2 days)
-    $hoursAgo = Get-Random -Minimum 0 -Maximum 48
+    $hoursAgo = ($i % 48)
     $receivedDate = (Get-Date).AddHours(-$hoursAgo)
     
-    $emailId = [guid]::NewGuid().ToString()
+    $emailId = "email_inbox_$emailCounter"
     $email = @{
         Id = $emailId
         Subject = $subject
@@ -120,16 +118,20 @@ for ($i = 0; $i -lt $NewInboxCount; $i++) {
         To = $protagonist.Email
         ToName = $protagonist.DisplayName
         Cc = ""
-        Body = $generator.GenerateEmailBody($subject)
-        IsRead = $false  # New emails are unread
-        HasAttachments = (Get-Random -Maximum 8) -eq 0
-        Importance = @("Normal", "Normal", "Normal", "Normal", "High")[(Get-Random -Maximum 5)]
+        Body = "Email body for: $subject"
+        IsRead = $false
+        HasAttachments = ($i % 8) -eq 0
+        Importance = @("Normal", "Normal", "Normal", "Normal", "High")[$i % 5]
         ReceivedDate = $receivedDate.ToString("yyyy-MM-ddTHH:mm:ss")
         FolderPath = "Inbox"
-        ConversationId = [guid]::NewGuid().ToString()
+        ConversationId = "conv_inbox_$emailCounter"
     }
     $emails[$emailId] = $email
     $newEmailIds += $emailId
+    $emailCounter++
+    $senderIndex++
+    $subjectIndex++
+    $topicIndex++
 }
 
 # Generate new sent emails
@@ -146,15 +148,15 @@ $sentSubjects = @(
 )
 
 for ($i = 0; $i -lt $NewSentCount; $i++) {
-    $recipient = $colleagueList[(Get-Random -Maximum $colleagueList.Count)]
-    $subject = $sentSubjects[(Get-Random -Maximum $sentSubjects.Count)]
-    $topic = $topics[(Get-Random -Maximum $topics.Count)]
+    $recipient = $colleagueList[$senderIndex % $colleagueList.Count]
+    $subject = $sentSubjects[$subjectIndex % $sentSubjects.Count]
+    $topic = $topics[$topicIndex % $topics.Count]
     $subject = $subject -replace '\{topic\}', $topic
     
-    $hoursAgo = Get-Random -Minimum 0 -Maximum 48
+    $hoursAgo = ($i % 48)
     $sentDate = (Get-Date).AddHours(-$hoursAgo)
     
-    $emailId = [guid]::NewGuid().ToString()
+    $emailId = "email_sent_$emailCounter"
     $email = @{
         Id = $emailId
         Subject = $subject
@@ -163,16 +165,20 @@ for ($i = 0; $i -lt $NewSentCount; $i++) {
         To = $recipient.Email
         ToName = $recipient.DisplayName
         Cc = ""
-        Body = $generator.GenerateEmailBody($subject)
+        Body = "Email body for: $subject"
         IsRead = $true
-        HasAttachments = (Get-Random -Maximum 10) -eq 0
+        HasAttachments = ($i % 10) -eq 0
         Importance = "Normal"
         ReceivedDate = $sentDate.ToString("yyyy-MM-ddTHH:mm:ss")
         FolderPath = "Sent Items"
-        ConversationId = [guid]::NewGuid().ToString()
+        ConversationId = "conv_sent_$emailCounter"
     }
     $emails[$emailId] = $email
     $newEmailIds += $emailId
+    $emailCounter++
+    $senderIndex++
+    $subjectIndex++
+    $topicIndex++
 }
 
 # Generate new meetings
@@ -190,27 +196,27 @@ $meetingTypes = @(
 )
 
 for ($i = 0; $i -lt $NewMeetingCount; $i++) {
-    $meetingType = $meetingTypes[(Get-Random -Maximum $meetingTypes.Count)]
-    $topic = $topics[(Get-Random -Maximum $topics.Count)]
-    $randomColleague = $colleagueList[(Get-Random -Maximum $colleagueList.Count)]
+    $meetingType = $meetingTypes[$i % $meetingTypes.Count]
+    $topic = $topics[$topicIndex % $topics.Count]
+    $randomColleague = $colleagueList[$senderIndex % $colleagueList.Count]
     
     $meetingType = $meetingType -replace '\{topic\}', $topic
     $meetingType = $meetingType -replace '\{person\}', $randomColleague.DisplayName
     
     # Future meetings (next 1-14 days)
-    $daysAhead = Get-Random -Minimum 1 -Maximum 15
-    $startHour = Get-Random -Minimum 8 -Maximum 17
-    $duration = @(30, 30, 45, 60)[(Get-Random -Maximum 4)]
+    $daysAhead = (($i % 14) + 1)
+    $startHour = (($i % 10) + 8)
+    $duration = @(30, 30, 45, 60)[$i % 4]
     
     $startTime = (Get-Date).Date.AddDays($daysAhead).AddHours($startHour)
     $endTime = $startTime.AddMinutes($duration)
     
-    $isOrganizer = (Get-Random -Maximum 2) -eq 0
+    $isOrganizer = ($i % 2) -eq 0
     
     $attendees = @($protagonist.Email)
-    $attendeeCount = Get-Random -Minimum 1 -Maximum 4
+    $attendeeCount = (($i % 3) + 1)
     for ($j = 0; $j -lt $attendeeCount; $j++) {
-        $attendee = $colleagueList[(Get-Random -Maximum $colleagueList.Count)]
+        $attendee = $colleagueList[($senderIndex + $j) % $colleagueList.Count]
         if ($attendees -notcontains $attendee.Email) {
             $attendees += $attendee.Email
         }
@@ -218,7 +224,7 @@ for ($i = 0; $i -lt $NewMeetingCount; $i++) {
     
     $organizer = if ($isOrganizer) { $protagonist.Email } else { $randomColleague.Email }
     
-    $meetingId = [guid]::NewGuid().ToString()
+    $meetingId = "meeting_$i"
     $meeting = @{
         Id = $meetingId
         Subject = $meetingType
@@ -227,7 +233,7 @@ for ($i = 0; $i -lt $NewMeetingCount; $i++) {
         Attendees = ($attendees | Where-Object { $_ -ne $organizer }) -join "; "
         StartTime = $startTime.ToString("yyyy-MM-ddTHH:mm:ss")
         EndTime = $endTime.ToString("yyyy-MM-ddTHH:mm:ss")
-        Location = @("Zoom", "Teams", "Google Meet", "Conference Room A")[(Get-Random -Maximum 4)]
+        Location = @("Zoom", "Teams", "Google Meet", "Conference Room A")[$i % 4]
         IsRecurring = $false
         Body = "Agenda:`n1. Discussion: $topic`n2. Action items`n3. Next steps"
         ReminderMinutes = 15
@@ -236,6 +242,8 @@ for ($i = 0; $i -lt $NewMeetingCount; $i++) {
     }
     $meetings[$meetingId] = $meeting
     $newMeetingIds += $meetingId
+    $senderIndex++
+    $topicIndex++
 }
 
 # Mark some old unread emails as read
