@@ -1,0 +1,15 @@
+name: ClamAV Security Scan
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  clamav-scan:
+    uses: dstaulcu/github-clamav-scanner/.github/workflows/clamav-scan.yml@main
+    permissions:
+      contents: read
+      issues: write
