@@ -45,14 +45,27 @@ Write-Host "Department:  $UserDepartment" -ForegroundColor Green
 Write-Host "Title:       $UserTitle" -ForegroundColor Green
 Write-Host ""
 
+# Helper function to select random item from array
+function Select-RandomItem {
+    param([array]$Items)
+    $index = [System.Random]::new().Next(0, $Items.Count)
+    return $Items[$index]
+}
+
+# Helper function to generate unique identifier
+function New-UniqueId {
+    return [System.Guid]::NewGuid().ToString()
+}
+
 # Initialize generator
 $generator = New-MockDataGenerator -Domain "dataflow.local"
 
 # Create the protagonist user
+$nameParts = $UserName -split ' '
 $protagonist = @{
-    Id = [guid]::NewGuid().ToString()
-    FirstName = ($UserName -split ' ')[0]
-    LastName = ($UserName -split ' ')[-1]
+    Id = New-UniqueId
+    FirstName = $nameParts[0]
+    LastName = $nameParts[-1]
     DisplayName = $UserName
     Username = ($UserEmail -split '@')[0]
     Email = $UserEmail
@@ -115,30 +128,44 @@ $topics = @(
 
 $colleagueList = @($colleagues.Values)
 
+$rng = [System.Random]::new()
 for ($i = 0; $i -lt $InboxEmailCount; $i++) {
-    $sender = $colleagueList[(Get-Random -Maximum $colleagueList.Count)]
-    $subject = $inboxSubjects[(Get-Random -Maximum $inboxSubjects.Count)]
-    $topic = $topics[(Get-Random -Maximum $topics.Count)]
-    $subject = $subject -replace '\{topic\}', $topic
+    $senderIndex = $rng.Next(0, $colleagueList.Count)
+    $sender = $colleagueList[$senderIndex]
     
-    $daysAgo = Get-Random -Minimum 0 -Maximum 60
-    $receivedDate = (Get-Date).AddDays(-$daysAgo).AddHours(-(Get-Random -Maximum 12))
+    $subjectIndex = $rng.Next(0, $inboxSubjects.Count)
+    $subjectTemplate = $inboxSubjects[$subjectIndex]
+    
+    $topicIndex = $rng.Next(0, $topics.Count)
+    $selectedTopic = $topics[$topicIndex]
+    $finalSubject = $subjectTemplate.Replace('{topic}', $selectedTopic)
+    
+    $daysAgo = $rng.Next(0, 60)
+    $hoursAgo = $rng.Next(0, 12)
+    $receivedDate = (Get-Date).AddDays(-$daysAgo).AddHours(-$hoursAgo)
+    
+    $isRead = ($daysAgo -gt 3) -or ($rng.Next(0, 3) -eq 0)
+    $hasAttachments = ($rng.Next(0, 6) -eq 0)
+    
+    $importanceOptions = @("Normal", "Normal", "Normal", "Normal", "High", "Low")
+    $importanceIndex = $rng.Next(0, 6)
+    $importance = $importanceOptions[$importanceIndex]
     
     $email = @{
-        Id = [guid]::NewGuid().ToString()
-        Subject = $subject
+        Id = New-UniqueId
+        Subject = $finalSubject
         From = $sender.Email
         FromName = $sender.DisplayName
         To = $protagonist.Email
         ToName = $protagonist.DisplayName
         Cc = ""
-        Body = $generator.GenerateEmailBody($subject)
-        IsRead = ($daysAgo -gt 3) -or ((Get-Random -Maximum 3) -eq 0)
-        HasAttachments = (Get-Random -Maximum 6) -eq 0
-        Importance = @("Normal", "Normal", "Normal", "Normal", "High", "Low")[(Get-Random -Maximum 6)]
+        Body = $generator.GenerateEmailBody($finalSubject)
+        IsRead = $isRead
+        HasAttachments = $hasAttachments
+        Importance = $importance
         ReceivedDate = $receivedDate.ToString("yyyy-MM-ddTHH:mm:ss")
         FolderPath = "Inbox"
-        ConversationId = [guid]::NewGuid().ToString()
+        ConversationId = New-UniqueId
     }
     $emails[$email.Id] = $email
 }
@@ -159,29 +186,37 @@ $sentSubjects = @(
 )
 
 for ($i = 0; $i -lt $SentEmailCount; $i++) {
-    $recipient = $colleagueList[(Get-Random -Maximum $colleagueList.Count)]
-    $subject = $sentSubjects[(Get-Random -Maximum $sentSubjects.Count)]
-    $topic = $topics[(Get-Random -Maximum $topics.Count)]
-    $subject = $subject -replace '\{topic\}', $topic
+    $recipientIndex = $rng.Next(0, $colleagueList.Count)
+    $recipient = $colleagueList[$recipientIndex]
     
-    $daysAgo = Get-Random -Minimum 0 -Maximum 60
-    $sentDate = (Get-Date).AddDays(-$daysAgo).AddHours(-(Get-Random -Maximum 12))
+    $subjectIndex = $rng.Next(0, $sentSubjects.Count)
+    $subjectTemplate = $sentSubjects[$subjectIndex]
+    
+    $topicIndex = $rng.Next(0, $topics.Count)
+    $selectedTopic = $topics[$topicIndex]
+    $finalSubject = $subjectTemplate.Replace('{topic}', $selectedTopic)
+    
+    $daysAgo = $rng.Next(0, 60)
+    $hoursAgo = $rng.Next(0, 12)
+    $sentDate = (Get-Date).AddDays(-$daysAgo).AddHours(-$hoursAgo)
+    
+    $hasAttachments = ($rng.Next(0, 8) -eq 0)
     
     $email = @{
-        Id = [guid]::NewGuid().ToString()
-        Subject = $subject
+        Id = New-UniqueId
+        Subject = $finalSubject
         From = $protagonist.Email
         FromName = $protagonist.DisplayName
         To = $recipient.Email
         ToName = $recipient.DisplayName
         Cc = ""
-        Body = $generator.GenerateEmailBody($subject)
+        Body = $generator.GenerateEmailBody($finalSubject)
         IsRead = $true
-        HasAttachments = (Get-Random -Maximum 8) -eq 0
+        HasAttachments = $hasAttachments
         Importance = "Normal"
         ReceivedDate = $sentDate.ToString("yyyy-MM-ddTHH:mm:ss")
         FolderPath = "Sent Items"
-        ConversationId = [guid]::NewGuid().ToString()
+        ConversationId = New-UniqueId
     }
     $emails[$email.Id] = $email
 }
@@ -212,29 +247,38 @@ $meetingTypes = @(
 $meetings = @{}
 
 for ($i = 0; $i -lt $MeetingCount; $i++) {
-    $meetingType = $meetingTypes[(Get-Random -Maximum $meetingTypes.Count)]
-    $topic = $topics[(Get-Random -Maximum $topics.Count)]
-    $randomColleague = $colleagueList[(Get-Random -Maximum $colleagueList.Count)]
+    $typeIndex = $rng.Next(0, $meetingTypes.Count)
+    $meetingType = $meetingTypes[$typeIndex]
     
-    $meetingType = $meetingType -replace '\{topic\}', $topic
-    $meetingType = $meetingType -replace '\{person\}', $randomColleague.DisplayName
+    $topicIndex = $rng.Next(0, $topics.Count)
+    $selectedTopic = $topics[$topicIndex]
+    
+    $colleagueIndex = $rng.Next(0, $colleagueList.Count)
+    $randomColleague = $colleagueList[$colleagueIndex]
+    
+    $meetingType = $meetingType.Replace('{topic}', $selectedTopic)
+    $meetingType = $meetingType.Replace('{person}', $randomColleague.DisplayName)
     
     # Mix of past and future meetings
-    $daysOffset = Get-Random -Minimum -14 -Maximum 21
-    $startHour = Get-Random -Minimum 8 -Maximum 17
-    $duration = @(30, 30, 45, 60, 60, 90)[(Get-Random -Maximum 6)]
+    $daysOffset = $rng.Next(-14, 21)
+    $startHour = $rng.Next(8, 17)
+    
+    $durationOptions = @(30, 30, 45, 60, 60, 90)
+    $durationIndex = $rng.Next(0, 6)
+    $duration = $durationOptions[$durationIndex]
     
     $startTime = (Get-Date).Date.AddDays($daysOffset).AddHours($startHour)
     $endTime = $startTime.AddMinutes($duration)
     
     # Randomly decide if protagonist is organizer or attendee
-    $isOrganizer = (Get-Random -Maximum 2) -eq 0
+    $isOrganizer = ($rng.Next(0, 2) -eq 0)
     
     # Pick 1-5 additional attendees
-    $attendeeCount = Get-Random -Minimum 1 -Maximum 6
+    $attendeeCount = $rng.Next(1, 6)
     $attendees = @($protagonist.Email)
     for ($j = 0; $j -lt $attendeeCount; $j++) {
-        $attendee = $colleagueList[(Get-Random -Maximum $colleagueList.Count)]
+        $attendeeIndex = $rng.Next(0, $colleagueList.Count)
+        $attendee = $colleagueList[$attendeeIndex]
         if ($attendees -notcontains $attendee.Email) {
             $attendees += $attendee.Email
         }
@@ -245,18 +289,24 @@ for ($i = 0; $i -lt $MeetingCount; $i++) {
         $attendees += $organizer
     }
     
+    $locationOptions = @("Zoom", "Teams", "Google Meet", "Conference Room A", "Conference Room B", "Huddle Space")
+    $locationIndex = $rng.Next(0, 6)
+    
+    $reminderOptions = @(5, 10, 15, 30)
+    $reminderIndex = $rng.Next(0, 4)
+    
     $meeting = @{
-        Id = [guid]::NewGuid().ToString()
+        Id = New-UniqueId
         Subject = $meetingType
         Organizer = $organizer
         OrganizerName = if ($isOrganizer) { $protagonist.DisplayName } else { $randomColleague.DisplayName }
         Attendees = ($attendees | Where-Object { $_ -ne $organizer }) -join "; "
         StartTime = $startTime.ToString("yyyy-MM-ddTHH:mm:ss")
         EndTime = $endTime.ToString("yyyy-MM-ddTHH:mm:ss")
-        Location = @("Zoom", "Teams", "Google Meet", "Conference Room A", "Conference Room B", "Huddle Space")[(Get-Random -Maximum 6)]
-        IsRecurring = (Get-Random -Maximum 4) -eq 0
-        Body = "Agenda:`n1. Review previous action items`n2. Main discussion: $topic`n3. Next steps`n4. Q&A"
-        ReminderMinutes = @(5, 10, 15, 30)[(Get-Random -Maximum 4)]
+        Location = $locationOptions[$locationIndex]
+        IsRecurring = ($rng.Next(0, 4) -eq 0)
+        Body = "Agenda:`n1. Review previous action items`n2. Main discussion: $selectedTopic`n3. Next steps`n4. Q&A"
+        ReminderMinutes = $reminderOptions[$reminderIndex]
         IsAccepted = $true
         IsCancelled = $false
     }
